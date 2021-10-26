@@ -1,7 +1,3 @@
-// const cloudinary = require('cloudinary').v2;
-// const linkify = require('linkifyjs'); 
-// const axios = require('axios');
-// require('linkifyjs/plugins/hashtag')(linkify);
 const Book = require('../models/book');
 const fs = require('fs')
 const User = require('../models/user');
@@ -9,10 +5,6 @@ const PurcMaterial = require('../models/purcMaterial');
 const PaidPost = require('../models/paidPost');
 const { post } = require('../routes/post');
 const Review = require('../models/review');
-// const Notification = require('../models/Notification');
-// const socketHandler = require('../handlers/socketHandler');
-// const fs = require('fs');
-// const ObjectId = require('mongoose').Types.ObjectId;
 
 module.exports.postByUsername = async (req, res) => {
     const { files, caption, paid, price, title } = req.body;
@@ -65,8 +57,7 @@ module.exports.getUserMaterialByUsername = async (req, res, next) => {
     let results = {}
 
     try {
-        const book = await Book.find({ author: req.params.username }).sort([['date', -1]]).limit(limit).skip(startIndex).exec()
-        // const user = await User.findOne({ username: req.params.username })
+        const book = await Book.find({ author: req.params.username }, { files: 0 }).sort([['date', -1]]).limit(limit).skip(startIndex).exec()
         results.result = book
         return res.status(200).send(results)
     } catch (error) {
@@ -131,7 +122,7 @@ module.exports.buyMaterial = async (req, res) => {
 
 module.exports.getPurcMaterialById = async (req, res) => {
     try {
-        const { purcmaterial } = await PurcMaterial.findOne({ userId: req.params.userId })
+        const { purcmaterial } = await PurcMaterial.findOne({ userId: req.params.userId }, { files: 0 })
         console.log(purcmaterial);
         const resultArray = purcmaterial.map(async (id) => {
             console.log();
@@ -169,6 +160,12 @@ module.exports.getReviewByMaterialId = async (req, res) => {
     }
 }
 
+module.exports.checkPurchased = async (req, res) => {
+    const { userId, materialId } = req.body
+    const responce = await PurcMaterial.findOne({ userId, "purcmaterial._id": materialId })
+    if (responce) return res.status(200).send(true)
+    else return res.status(202).send(false)
+}
 
 
 
