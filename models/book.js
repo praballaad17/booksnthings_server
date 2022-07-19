@@ -1,8 +1,8 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
-const PostSchema = new Schema({
-    files: Array,
+const BookSchema = new Schema({
+    files: String,
     thumbnail: String,
     caption: String,
     hashtags: [
@@ -19,6 +19,17 @@ const PostSchema = new Schema({
         type: String,
         ref: 'User',
     },
+    title: {
+        type: String,
+        require: true,
+    },
+    paid: {
+        type: mongoose.Schema({
+            isPaid: Boolean,
+            price: Number,
+            hasPaid: Boolean
+        })
+    }
 });
 
 // PostSchema.pre('deleteOne', async function (next) {
@@ -32,5 +43,5 @@ const PostSchema = new Schema({
 //   }
 // });
 
-const Post = mongoose.model('Post', PostSchema);
-module.exports = Post;
+const Book = mongoose.model('Book', BookSchema);
+module.exports = Book;

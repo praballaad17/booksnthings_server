@@ -1,8 +1,7 @@
 const jwt = require('jwt-simple');
 const crypto = require('crypto');
 const User = require('../models/user');
-const Followers = require('../models/Followers');
-const Following = require('../models/Following');
+const PurcMaterial = require('../models/purcMaterial');
 const ConfirmationToken = require('../models/confirmationToken');
 const profileImg = require('../models/profileImg');
 const bcrypt = require('bcrypt');
@@ -21,9 +20,7 @@ const {
 module.exports.verifyJwt = (token) => {
     return new Promise(async (resolve, reject) => {
         try {
-            console.log(token, jwt.decode(token, process.env.JWT_SECRET));
             const id = jwt.decode(token, process.env.JWT_SECRET).id;
-            console.log(id);
             const user = await User.findOne(
                 { _id: id },
                 'email username avatar bookmarks bio fullName confirmed website'
@@ -40,10 +37,10 @@ module.exports.verifyJwt = (token) => {
 };
 
 module.exports.requireAuth = async (req, res, next) => {
-    const { authorization } = req.headers;
-    if (!authorization) return res.status(401).send({ error: 'Not authorized.' });
+    const { token } = req.headers;
+    if (!token) return res.status(401).send({ error: 'Not authorized.' });
     try {
-        const user = await this.verifyJwt(authorization);
+        const user = await this.verifyJwt(token);
         // Allow other middlewares to access the authenticated user details.
         res.locals.user = user;
         return next();
@@ -150,12 +147,10 @@ module.exports.register = async (req, res, next) => {
             user: user._id,
             token: crypto.randomBytes(20).toString('hex'),
         });
-        const followers = new Followers({ user: user._id, followers: [] })
-        const following = new Following({
-            user: user._id, following: [
-                { _id: "61115fb24b64ee0022c2282d" }
-            ]
+        const purcMaterial = new PurcMaterial({
+            userId: user._id, username: user.username, purcmaterial: []
         })
+
         const displayImg = await profileImg({
             user: {
                 username: username,
@@ -168,8 +163,7 @@ module.exports.register = async (req, res, next) => {
         })
         await user.save();
         await confirmationToken.save();
-        await followers.save();
-        await following.save();
+        await purcMaterial.save();
         await displayImg.save()
         res.status(201).send({
             user: {

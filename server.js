@@ -1,6 +1,5 @@
 const express = require("express");
 // const users = require("./routes/users");
-// const folders = require("./routes/folders");
 const user = require("./routes/user");
 const auth = require("./routes/auth");
 const post = require("./routes/post");

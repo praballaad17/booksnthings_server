@@ -1,105 +1,171 @@
-// const cloudinary = require('cloudinary').v2;
-// const linkify = require('linkifyjs'); 
-// const axios = require('axios');
-// require('linkifyjs/plugins/hashtag')(linkify);
-const Post = require('../models/post');
+const Book = require('../models/book');
 const fs = require('fs')
 const User = require('../models/user');
-const Following = require('../models/Following');
-// const Notification = require('../models/Notification');
-// const socketHandler = require('../handlers/socketHandler');
-// const fs = require('fs');
-// const ObjectId = require('mongoose').Types.ObjectId;
+const PurcMaterial = require('../models/purcMaterial');
+const PaidPost = require('../models/paidPost');
+const { post } = require('../routes/post');
+const Review = require('../models/review');
 
-module.exports.postByUsername = async (req, res, next) => {
-    const { files, caption } = req.body;
+module.exports.postByUsername = async (req, res) => {
+    const { _id, files, caption, paid, price, title } = req.body;
+    let paidPost
     try {
-        post = new Post({ files: files, caption: caption, author: req.params.username });
-        await post.save();
-        res.status(201).send(post);
+        const book = new Book({
+            _id, files: files, caption: caption, author: req.params.username, title: title, paid: {
+                isPaid: paid,
+                price: price,
+            }
+        });
+        if (paid) {
+            paidPost = new PaidPost({ _id: book._id, author: req.params.username, price: price, paidUsers: [] })
+            await paidPost.save();
+        }
+        await book.save();
+
+        res.status(201).send(book);
     } catch (err) {
-        res.status(400).send(err, "unable to create post");
+        console.log(err);
+        res.status(400).send("unable to save book");
     }
 }
+
+module.exports.getUserPursMaterialByUsername = async (req, res) => {
+    try {
+        const book = await Book.findOne({ author: req.params.username })
+        res.send(book)
+    } catch (error) {
+        return res.send(error)
+    }
+}
+
 module.exports.retrivePostByUsername = async (req, res, next) => {
     try {
-        const post = await Post.findOne({ author: req.params.username })
+        const book = await Book.findOne({ author: req.params.username })
         res.send(post)
     } catch (error) {
-        res.send(error)
+        return res.send(error)
     }
 }
 
-module.exports.retrivePostByUserId = async (req, res, next) => {
-    const user = await User.findById(req.params.userId)
+module.exports.getUserMaterialByUsername = async (req, res, next) => {
+    const page = parseInt(req.query.page)
+    const limit = parseInt(req.query.limit)
+    // const logginUserId = req.query.logginUserId
+
+    const startIndex = (page - 1) * limit
+    const endIndex = page * limit
+    let results = {}
+
     try {
-        const post = await Post.findOne({ author: user?.username })
-        res.send(post)
+        const book = await Book.find({ author: req.params.username }, { files: 0 }).sort([['date', -1]]).limit(limit).skip(startIndex).exec()
+        results.result = book
+        return res.status(200).send(results)
     } catch (error) {
-        res.send(error)
+        return res.send(error)
     }
 }
 
-module.exports.getTimelinePosts = async (req, res, next) => {
-    const { following } = await Following.findOne({ user: req.params.userId })
-    following.push({ _id: req.params.userId })
-    const resultArray = following.map(async (item) => {
-        const result = await User.findById(item._id)
-        if (!result) {
-            return
-        }
-        return result.username
-    })
-    const followings = await Promise.all(resultArray);
+module.exports.searchBook = async (req, res) => {
+
     const page = parseInt(req.query.page)
     const limit = parseInt(req.query.limit)
 
     const startIndex = (page - 1) * limit
     const endIndex = page * limit
+    let results = [];
 
-    const results = {}
-
-    if (endIndex < await Post.countDocuments().exec()) {
-        results.next = {
-            page: page + 1,
-            limit: limit
-        }
-    }
-
-    if (startIndex > 0) {
-        results.previous = {
-            page: page - 1,
-            limit: limit
-        }
-    }
     try {
-        results.results = await Post.find({ author: { $in: followings } }).sort([['date', -1]]).limit(limit).skip(startIndex).exec()
-        res.send(results)
-    } catch (e) {
-        res.status(500).json({ message: e.message })
+        await Book.find({
+            $or: [
+                { title: { $regex: req.params.title } },
+                { author: { $regex: req.params.title } }
+            ]
+        }).limit(limit).skip(startIndex).exec()
+            .then(async (res) => {
+                for (let i = 0; i < res.length; i++) {
+
+                    results.push({ _id: res[i]._id, title: res[i].title, author: res[i].author, paid: res[i].paid })
+                }
+            })
+
+        return res.send(results)
+    } catch (error) {
+        return res.send(error)
     }
-    // res.json(res.paginatedResults)
 }
 
-module.exports.getUserPhotosByUsername = async (req, res, next) => {
+module.exports.getMaterialByTitle = async (req, res) => {
     try {
-        const post = await Post.find({ author: req.params.username })
-        res.send(post)
+        const book = await Book.findOne({ title: req.params.title })
+        res.send(book)
+    } catch (error) {
+        return res.send(error)
+    }
+}
+
+module.exports.buyMaterial = async (req, res) => {
+    const { author, userId, username } = req.body
+    console.log(req.params.materialId, author, userId, username);
+
+    try {
+        await PurcMaterial.findOneAndUpdate({ userId: userId }, {
+            $push: {
+                purcmaterial: [{ _id: req.params.materialId }]
+            }
+        })
+        console.log("added");
+        return res.send("added")
+    } catch (error) {
+        return res.send(error)
+    }
+}
+
+module.exports.getPurcMaterialById = async (req, res) => {
+    try {
+        const { purcmaterial } = await PurcMaterial.findOne({ userId: req.params.userId }, { files: 0 })
+        console.log(purcmaterial);
+        const resultArray = purcmaterial.map(async (id) => {
+            console.log();
+            const result = await Book.findById(id._id)
+            if (!result) {
+                return
+            }
+            return result
+        })
+        const books = await Promise.all(resultArray);
+        res.send(books)
     } catch (error) {
         res.send(error)
     }
 }
 
-module.exports.deletePostById = async (req, res, next) => {
+module.exports.addReview = async (req, res) => {
+    const { message, userId } = req.body
     try {
-        await Post.findOneAndDelete({ _id: req.params.postId })
-        res.status(200).send("deleted")
+        const review = new Review({ message, user: userId, book: req.params.materialId });
+        review.save()
+        res.send(review)
     } catch (error) {
-        res.send(error)
+        return res.send(error)
     }
 }
 
+module.exports.getReviewByMaterialId = async (req, res) => {
+    const { message, userId } = req.body
+    try {
+        const reviews = await Review.find({ book: req.params.materialId });
+        res.send(reviews)
+    } catch (error) {
+        return res.send(error)
+    }
+}
 
+module.exports.checkPurchased = async (req, res) => {
+    const { userId, materialId } = req.body
+    const responce = await PurcMaterial.findOne({ userId, "purcmaterial._id": materialId })
+    if (responce) return res.status(200).send(true)
+    else return res.status(202).send(false)
+}
 
 
 
