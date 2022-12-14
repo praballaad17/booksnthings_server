@@ -8,10 +8,12 @@ const Review = require('../models/review');
 
 module.exports.postByUsername = async (req, res) => {
     const { _id, files, caption, paid, price, title } = req.body;
+
+    console.log(req.body);
     let paidPost
     try {
         const book = new Book({
-            _id, files: files, caption: caption, author: req.params.username, title: title, paid: {
+            files: files, caption: caption, author: req.params.username, title: title, paid: {
                 isPaid: paid,
                 price: price,
             }
